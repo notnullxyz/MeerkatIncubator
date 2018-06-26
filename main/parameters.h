@@ -31,6 +31,9 @@
 // Sensors
 #define PIN_SENSOR_DHT11 12
 
+// Buzzer
+#define PIN_BUZZER 13
+
 // ----- RUNNING PARAMETERS -----
 // -- This is the daily alarm
 #define ALARM_DAILY_HOUR 00
@@ -55,7 +58,7 @@
 
 /* Timer Constants & Variables */
 const int COUNTER_1S = 1;
-const int COUNTER_10S = 10;
+const int COUNTER_5S = 5;
 const int COUNTER_1M = 60;
 const int COUNTER_15M = 900;
 const int COUNTER_1H = 3600;

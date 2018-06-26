@@ -22,20 +22,20 @@ int readingIndicatorActive = 0;
 int updateTimers = 0;
 DateTime rtcDateTime;
 
+enum DisplayMode {DISPLAYMODE_SENSORS = 1, DISPLAYMODE_STATUSES = 0}; // toggle switch for display mode.
+DisplayMode displayMode;
+
 // To keep track of device runtimes.
 unsigned long startTimeLamp;
 unsigned long startTimeHumidifier;
 unsigned long startTimeFan;
 
-uint8_t lampOn = 0;
-
-enum DisplayMode {DISPLAYMODE_SENSORS = 1, DISPLAYMODE_STATUSES = 0}; // toggle switch for display mode.
-DisplayMode displayMode;
-
 void setup() {
   pinMode(PIN_DISPLAY_MODE_TOGGLESW, INPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
 
   Serial.begin(115200);
+  Serial.println(F("Startup/setup()"));
 
   // In the beginnining...
   Clock.begin();
@@ -46,7 +46,64 @@ void setup() {
   wdt_enable(WDTO_8S);  // watchdog threshold to 8 secs
   configureTimers();
   setupAlarms();
+  buzzerTest();
+  //whateverWillBuzz();
 }
+
+void buzzerTest() {
+  Serial.println(F("buzzer test"));
+  tone(PIN_BUZZER, 500, 200);
+  delay(50);
+  tone(PIN_BUZZER, 830, 200);
+  delay(50);
+  tone(PIN_BUZZER, 1130, 200);
+  delay(50);
+  tone(PIN_BUZZER, 1375, 200);
+  delay(50);
+  tone(PIN_BUZZER, 1690, 200);
+  delay(50);
+}
+
+void buzzerHourly() {
+  tone(PIN_BUZZER, 650, 300);
+  delay(350);
+  tone(PIN_BUZZER, 800, 300);
+  delay(350);
+  tone(PIN_BUZZER, 1250, 400);
+  delay(350);  
+}
+
+void buzzerBlip() {
+  tone(PIN_BUZZER, 200, 20);
+}
+
+void whateverWillBuzz() {
+  tone(PIN_BUZZER, 391, 700); // que
+  delay(600);
+  tone(PIN_BUZZER, 349, 400);  // se
+  delay(400);
+  tone(PIN_BUZZER, 329, 650);  // ra
+  delay(600);
+  tone(PIN_BUZZER, 261, 400);  // se
+  delay(400);
+  tone(PIN_BUZZER, 329, 600);  // ra
+  delay(900);
+  tone(PIN_BUZZER, 369, 400);  // what
+  delay(400);
+  tone(PIN_BUZZER, 440, 250);  // ev
+  delay(250);
+  tone(PIN_BUZZER, 391, 250);  // ver
+  delay(250);
+  tone(PIN_BUZZER, 329, 250);  // will
+  delay(250);
+  tone(PIN_BUZZER, 293, 600);  // be
+  delay(700);
+  tone(PIN_BUZZER, 220, 300);  // will
+  delay(300);
+  tone(PIN_BUZZER, 293, 800);  // be
+  delay(500);
+}
+
 
 void loop() {
   wdt_reset();  // reset watchdog, still ok here.
@@ -59,10 +116,15 @@ void loop() {
   }
 
   alarmsFired = Clock.checkAlarms();
-  if (alarmsFired & 2) { // check alarm type 2
+  if (alarmsFired & 2) { // check alarm type 2 - and handle it if its time!
     handleAlarm();
   }
 }
+
+
+//
+// ========================================================= SCHEDULERS INTERUPTS TIMERS  ========================================================
+//
 
 /*
   Configure the timer/s and interrupts.
@@ -71,21 +133,16 @@ void loop() {
 void configureTimers() {
   cli();                  // disable global interrupts
   TCCR1A = TCCR1B = 0;    // set entire TCCR1A and B registers to 0
-
   OCR1A = 15624;          // set interrupt to desired timer value
   // 16 000 000 cpu clock / (1024 prescaler * 1 hz desired interrupt frequency) - 1
 
   TIMSK1 |= (1 << OCIE1A);  // set the OCIE1A bit to enable timer compare interrupt
-
   TCCR1B |= (1 << WGM12);   // set WGM12 bit to enable CTC mode
-
   TCCR1B |= (1 << CS10);    // setting the CS10 bit on the TCCR1B register, the timer is running.
 
   // ISR(TIMER1_OVF_vect) will be called when it overflows.
   // ISR(TIMER1_COMPA_vect) will be called when it compare matches.
-
   TCCR1B |= (1 << CS12);    // Setting CS10 and CS12 bits = clock/1024 prescaling
-
   sei();                    // enable global interrupts
 }
 
@@ -102,7 +159,7 @@ ISR(TIMER1_COMPA_vect) {
 */
 void checkScheduler() {
   if ((timercount % COUNTER_1S) == 0) task_1S();
-  if ((timercount % COUNTER_10S) == 0) task_10S();
+  if ((timercount % COUNTER_5S) == 0) task_5S();
   if ((timercount % COUNTER_1M) == 0) task_1M();
   if ((timercount % COUNTER_15M) == 0) task_15M();
   if ((timercount % COUNTER_1H) == 0) task_1H();
@@ -112,43 +169,18 @@ void checkScheduler() {
 void task_1S() {
   Serial.print(F("1S"));
   checkAndResetReadingIndicator();
-
-  // do a check for OK'ness every second, and stop stuff if it must be stopped.
-  checkTempOKTurnOffLamp();
-  checkAndStopFan();
-  checkAndStopHumidifier();
-
   triggerScreenUpdate();
 }
 
 // This function is called every 10 Seconds
-void task_10S() {
-  Serial.print(F("10S"));
-  readSensorsAndNotify(); // reading sensors every ten seconds is good enough ?
-
-  if (checkTempTooLow() == 1) {
-    Serial.println(F("temp low - start lamp"));
-    checkAndSetAndStartLamp();
-  }
+void task_5S() {
+  Serial.print(F("5S"));
+  readSensorsAndNotify(); // reading sensors every 5 seconds is good enough ?
 }
 
 // This function is called every minute
 void task_1M() {
   Serial.print(F("1M"));
-
-  // once per minute, check for humidity upper limit , and kick off the humid alarm
-  if (sensors.getLastHumidity() >= HUMIDITY_MAX) {
-    Serial.println(" humid high - start fan and/or stop humidifier");
-    handleHumidLimitAlarm();
-  }
-
-  // once per minute check if humidity is too low, and kick off the humidifier
-  if (sensors.getLastHumidity() <= HUMIDITY_MIN) {
-    Serial.println(" humid low - start humidifier and/or stop fan ");
-    handleHumidLimitAlarm();
-  }
-
-  
 }
 
 // This function is called every 15 minutes
@@ -158,11 +190,17 @@ void task_15M() {
 
 // This function is called every Hour
 void task_1H() {
-  Serial.print(F("1H"));  
+  Serial.print(F("1H"));
+  buzzerHourly();
+  turnEggs();
 }
+
+
+
 
 // Get the display toggle switch position.
 int getDisplayToggleSwitchPosition() {
+  Serial.println(F("get sw pos"));  
   int switchPos = digitalRead(PIN_DISPLAY_MODE_TOGGLESW);
   displayMode = (switchPos == HIGH) ? 1 : 0;
   return displayMode;
@@ -172,6 +210,7 @@ int getDisplayToggleSwitchPosition() {
    Manages a nifty reading indicator on the lcd, times it, and clears it when ready.
 */
 void checkAndResetReadingIndicator() {
+  Serial.print(F("*"));  
   if (readingIndicatorActive == 1) {
     readingIndicatorActive++;
   } else if (readingIndicatorActive > 1) {
@@ -185,6 +224,7 @@ void checkAndResetReadingIndicator() {
    This also times and shows a little reading indicator on the lcd.
 */
 void readSensorsAndNotify() {
+  Serial.println(F("^"));  
   if (displayMode == DISPLAYMODE_SENSORS) {
     display.showReadingIndicator();
     readingIndicatorActive = 1;
@@ -194,7 +234,7 @@ void readSensorsAndNotify() {
 
 // Keep screen update logic separated out of the timer code.
 void triggerScreenUpdate() {
-
+  Serial.print(F(" ScrUpd "));  
   displayMode = getDisplayToggleSwitchPosition();
 
   // Update the display every 5 seconds with statuses depending on the toggle switch position.
@@ -215,6 +255,10 @@ void triggerScreenUpdate() {
   }
 }
 
+
+//
+// ========================================================= RTC AND ALARM ========================================================
+//
 
 /**
    For setting RTC date and time.
@@ -244,87 +288,7 @@ char* getRealDate() {
   return dateString;
 }
 
-/**
-   Checks if lamp need to start based on temperature too low.
-   Returns 1 if lamp should start, or 0 if not.
-*/
-int checkTempTooLow() {
-  float temperature = sensors.getLastTemperature();
-  bool tempTooLow = false;
-
-  if (temperature < DEGREES_MIN) {
-    tempTooLow = true;
-  }
-
-  return tempTooLow ? 1 : 0;
-}
-
-/**
-   Stop (and reset) the lamp if temperature is over max
-*/
-void checkTempOKTurnOffLamp() {
-
-  // we can skip all the checks and logic if the fans aren't ectually running
-  if (relay.statusLamp() == true) {
-    float temperature = sensors.getLastTemperature();
-    bool tempNormal = false;
-
-    if (temperature > DEGREES_MIN) {
-      tempNormal = true;
-    }
-
-    if (tempNormal) {
-      relay.stopLamp();
-    }
-  }
-}
-
-/**
-   Start the lamp after doing any neccesary checks and sets.
-*/
-void checkAndSetAndStartLamp() {
-  if (LAMP_DISABLE == 0) {
-    startTimeLamp = millis();
-    relay.startLamp();
-    lampOn = 1;
-  }
-}
-
-
-// stop and reset the fan if the reasons for running it is over.
-void checkAndStopFan() {
-  // we can skip all the checks and logic if the fan isn't ectually running
-  if (relay.statusFan() == true) {
-    float humidity = sensors.getLastHumidity();
-    bool humidNormal = false;
-
-    if (humidity < HUMIDITY_MAX) {
-      humidNormal = true;
-    }
-
-    if (humidNormal) {
-      relay.stopFan();
-    }
-  }
-}
-
-// stop and reset the humidifier if the reason for running it is over.
-void checkAndStopHumidifier() {
-  // we can skip all the checks and logic if the humidifier isn't ectually running
-  if (relay.statusHumidifier() == true) {
-    float humidity = sensors.getLastHumidity();
-    bool humidNormal = false;
-
-    if (humidity < HUMIDITY_MAX) {
-      humidNormal = true;
-    }
-
-    if (humidNormal) {
-      relay.stopFan();
-    }
-  }
-}
-
+// Setup a main daily alarm
 void setupAlarms() {
   Clock.disableAlarms();
   DateTime alarmTimestamp = Clock.read();
@@ -334,99 +298,112 @@ void setupAlarms() {
 }
 
 /**
-   This is the handler function for the main daily watering.
-   Relays can be triggered here.
+   This is the handler function for the main daily alarm...
 */
 void handleAlarm() {
-  Serial.print("ALARM_MAIN!");
-  checkAndSetAndStartLamp();
+  Serial.print(F("ALARM_MAIN!"));
 }
 
-/**
-   This function is called when the humidity is too high.
-   The purpose here is to start the fan and extract humidity
-*/
-void handleHumidLimitAlarm() {
-  // these two will handle too much humidity
-  checkAndStopHumidifier();
-  checkAndSetAndStartFan();
 
-  // these two will handle too little humidity
-  checkAndStopFan();
-  checkAndSetAndStartHumidifier();
+//
+// ========================================================= GRUNT WORK ========================================================
+//
+
+
+// ===================== ON OFF convenience function ===============================
+
+void lampOn() {
+  Serial.print(F("lamp: on"));
+  relay.startLamp();
 }
 
-/**
-   All prestart safety checks happen here.
-   Will return true if safe enough to go ahead with start
-   @return boolean
-*/
-bool startSafetyCheck() {
-  // short circuited, no checks right now.
-  return true;
+void lampOff() {
+  Serial.print(F("lamp: off"));
+  relay.stopLamp();
 }
 
-/**
-   Set start times, and then fire off the fan to get rid of humidity
-*/
-void checkAndSetAndStartFan() {
-  if (!startSafetyCheck()) {
-    Serial.print("Safety checks did not pass. Not starting anything now.");
-    return;
-  }
-
-  if (FAN_DISABLE == 0) {
-    startTimeFan = millis();
-    relay.startFan();
-  }
+void fanOn() {
+  Serial.print(F("fan: on"));
+  relay.startFan();
 }
 
+void fanOff() {
+  Serial.print(F("fan: off"));
+  relay.stopFan();
+}
+
+void humidifierOn() {
+  Serial.print(F("humidifier: on"));
+  relay.startHumidifier();
+}
+
+void humidifierOff() {
+  Serial.print(F("humidifier: off"));
+  relay.stopHumidifier();
+}
+
+
+// ====================================== TEMPERATURE CONTROL ====================
 /**
- * Set the start times and then fire off the humidifier
+ * bool tempMax()
+ * bool tempMin()
+ * bool tempOK()
  */
-void checkAndSetAndStartHumidifier() {
-  if (!startSafetyCheck()) {
-    Serial.print("Safety checks did not pass. Not starting anything now.");
+
+// True if current temperature is at or over the max defined
+bool tempMax() {
+  float temperature = sensors.getLastTemperature();
+  return (temperature >= DEGREES_MAX) ? true : false;
+}
+
+// True if current temperature is at or below the minimum defined
+bool tempMin() {
+  float temperature = sensors.getLastTemperature();
+  return (temperature <= DEGREES_MIN) ? true : false;
+}
+
+// True if current temperature is between the min and max defined ranges
+bool tempOK() {
+  float temperature = sensors.getLastTemperature();
+  return ((temperature >= DEGREES_MIN) && (temperature <= DEGREES_MAX)) ? true : false;
+}
+
+
+// ======================================== HUMIDITY CONTROL ====================
+
+// True if current humidity is at or over the max defined
+bool humidMax() {
+  float humidity = sensors.getLastHumidity();
+  return (humidity >= HUMIDITY_MAX) ? true : false;
+}
+
+// True if current humidity is at or below the minimum defined
+bool humidMin() {
+  float humidity = sensors.getLastHumidity();
+  return (humidity <= HUMIDITY_MIN) ? true : false;
+}
+
+// True if current humidity is between the min and max defined ranges
+bool humidOK() {
+  float humidity = sensors.getLastHumidity();
+  return ((humidity >= HUMIDITY_MIN) && (humidity <= HUMIDITY_MAX)) ? true : false;
+}
+
+
+// ========================================== CLIMATE COMMAND CENTRE! ======================
+
+void periodicControl() {
+
+  if (humidOK() || tempOK()) {  // if everything is ok, don't change anything.
     return;
   }
 
-  if (HUMIDIFIER_DISABLE == 0) {
-    startTimeHumidifier = millis();
-    relay.startHumidifier();
+  if (!humidOK()) { // something needs ajdustment with humidity.
+    
   }
   
 }
 
-/**
-   Unset the start time of the humidifier, if its running, then switch it off after a prefined amount of time.
-*/
-void checkAndResetAndTerminateHumidifier() {
-  unsigned long currentMillis = millis();
+// ========================================== EGG TRAY CONTROL ==============================
 
-  // check how long X has been running, if it meets parameter criteria, stop it. (eg: dehumidify fan runtime?)
-
-  if (relay.statusHumidifier() == true) {
-    if (((currentMillis - startTimeHumidifier) / 1000) >= RUNTIME_SECONDS_HUMIDIFIER) {
-      startTimeHumidifier = 0L;
-      relay.stopHumidifier();
-    }
-  }
-}
-
-
-/**
-   Unset the start time of the extractor fan, if its running, then switch it off after a prefined amount of time.
-*/
-void checkAndResetAndTerminateFan() {
-  unsigned long currentMillis = millis();
-
-  // check how long X has been running, if it meets parameter criteria, stop it. (eg: dehumidify fan runtime?)
-
-  if (relay.statusHumidifier() == true) {
-    if (((currentMillis - startTimeFan) / 1000) >= RUNTIME_SECONDS_FAN) {
-      startTimeFan = 0L;
-      relay.stopFan();
-    }
-  }
-}
 

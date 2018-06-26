@@ -16,9 +16,7 @@ Sensors::Sensors() {
 }
 
 void Sensors::begin() {
-    
-    // Initialise the sensor pins for input.
-    // todo
+  // initialise any sensor stuff
 }
 
 /** 

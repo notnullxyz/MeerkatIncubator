@@ -16,7 +16,6 @@ Display::Display() : lcd(PIN_LCD_RS, PIN_LCD_ENABLE, PIN_LCD_D4, PIN_LCD_D5, PIN
 }
 
 void Display::begin() {
-  delay(500);
   lcd.home();
   lcd.print(SYS_GREETING);
   delay(2000);
