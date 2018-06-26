@@ -13,9 +13,9 @@
 //#define NAME_SOLENOID "XXX"
 
 // Pin mapping from relay board to arduino IO
-#define PIN_RELAY1_LAMP  8
+#define PIN_RELAY1_LAMP  10
 #define PIN_RELAY2_HUMIDIFIER  9
-#define PIN_RELAY3_FAN  10
+#define PIN_RELAY3_FAN  8
 //#define PIN_RELAY4_PUMP_B  11
 
 // Pin mapping from LCD to arduino IO
