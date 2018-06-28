@@ -344,28 +344,24 @@ void humidifierOff() {
 
 
 // ====================================== TEMPERATURE CONTROL ====================
-/**
- * bool tempMax()
- * bool tempMin()
- * bool tempOK()
- */
 
 // True if current temperature is at or over the max defined
 bool tempMax() {
   float temperature = sensors.getLastTemperature();
-  return (temperature >= DEGREES_MAX) ? true : false;
+  return (temperature >= (DEGREES_MAX + TEMPERATURE_SLACK_DEGREES)) ? true : false;
 }
 
 // True if current temperature is at or below the minimum defined
 bool tempMin() {
   float temperature = sensors.getLastTemperature();
-  return (temperature <= DEGREES_MIN) ? true : false;
+  return (temperature <= (DEGREES_MIN - TEMPERATURE_SLACK_DEGREES)) ? true : false;
 }
 
 // True if current temperature is between the min and max defined ranges
 bool tempOK() {
   float temperature = sensors.getLastTemperature();
-  return ((temperature >= DEGREES_MIN) && (temperature <= DEGREES_MAX)) ? true : false;
+  return ((temperature >= (DEGREES_MIN - TEMPERATURE_SLACK_DEGREES))
+    && (temperature <= (DEGREES_MAX + TEMPERATURE_SLACK_DEGREES))) ? true : false;
 }
 
 
@@ -374,19 +370,20 @@ bool tempOK() {
 // True if current humidity is at or over the max defined
 bool humidMax() {
   float humidity = sensors.getLastHumidity();
-  return (humidity >= HUMIDITY_MAX) ? true : false;
+  return (humidity >= (HUMIDITY_MAX + HUMIDITY_SLACK_PERCENT) ? true : false;
 }
 
 // True if current humidity is at or below the minimum defined
 bool humidMin() {
   float humidity = sensors.getLastHumidity();
-  return (humidity <= HUMIDITY_MIN) ? true : false;
+  return (humidity <= (HUMIDITY_MIN - HUMIDITY_SLACK_PERCENT)) ? true : false;
 }
 
 // True if current humidity is between the min and max defined ranges
 bool humidOK() {
   float humidity = sensors.getLastHumidity();
-  return ((humidity >= HUMIDITY_MIN) && (humidity <= HUMIDITY_MAX)) ? true : false;
+  return ((humidity >= (HUMIDITY_MIN - HUMIDITY_SLACK_PERCENT) 
+    && (humidity <= (HUMIDITY_MAX + HUMIDITY_SLACK_PERCENT)) ? true : false;
 }
 
 
@@ -394,16 +391,54 @@ bool humidOK() {
 
 void periodicControl() {
 
-  if (humidOK() || tempOK()) {  // if everything is ok, don't change anything.
+  // if everything is in OK range, exit the function and dont make adjustments.
+  if (humidOK() && tempOK()) {
     return;
   }
 
-  if (!humidOK()) { // something needs ajdustment with humidity.
-    
+  // if the humidity is not inside the min-max range, react:
+  if (!humidOK()) {
+    if (humidMax()) {
+      startFan();
+      stopHumidifier();
+    } else if(humidMin()) {
+      startHumidifier();
+      stopFan();
+    }
+  }
+
+  // if the temperature is not inside the min-max range, react:
+  if (!tempOK()) {
+    if (tempMin()) {
+      startLamp();
+      
+      if (humidOK()) {  // the fan also removes warm air, so:
+        stopFan();      //  If humidity is in OK range, stop the fan if it's running
+      }
+    } else if(tempMax()) {
+      stopLamp();
+    }
   }
   
 }
 
 // ========================================== EGG TRAY CONTROL ==============================
 
+/**
+ * The main function and entry point to making the egg tray rotate.
+ */
+function periodicEggRotate() {
+  // get the servo's current position (north or south);
+  // if north, rotate south
+  // if south, rotate north
+}
 
+// code for making the servo go south/that way <--
+function servoGoSouth() {
+
+}
+
+// code for making the servo go north/that way -->
+function servoGoNorth() {
+
+}

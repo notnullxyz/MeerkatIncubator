@@ -56,6 +56,10 @@
 #define HUMIDITY_MIN 45
 #define HUMIDITY_MAX 70
 
+// -- PADDING for adding tolerance/slack in the temperature and humidity min and maxes, 0 disables
+#define HUMIDITY_SLACK_PERCENT 5
+#define TEMPERATURE_SLACK_DEGREES 1
+
 /* Timer Constants & Variables */
 const int COUNTER_1S = 1;
 const int COUNTER_5S = 5;
