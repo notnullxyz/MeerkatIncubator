@@ -106,6 +106,7 @@ void whateverWillBuzz() {
 
 
 void loop() {
+ 
   wdt_reset();  // reset watchdog, still ok here.
 
   if (updateTimers != 0)
@@ -176,6 +177,7 @@ void task_1S() {
 void task_5S() {
   Serial.print(F("5S"));
   readSensorsAndNotify(); // reading sensors every 5 seconds is good enough ?
+  periodicControl();
 }
 
 // This function is called every minute
@@ -192,7 +194,7 @@ void task_15M() {
 void task_1H() {
   Serial.print(F("1H"));
   buzzerHourly();
-  turnEggs();
+  periodicEggRotate();
 }
 
 
@@ -230,6 +232,11 @@ void readSensorsAndNotify() {
     readingIndicatorActive = 1;
   }
   sensors.getActualReadings();
+  Serial.print(F("---- "));
+  Serial.print(sensors.getLastTemperature());
+  Serial.print(F(" / "));
+  Serial.print(sensors.getLastHumidity());
+  Serial.println(F(" ----"));
 }
 
 // Keep screen update logic separated out of the timer code.
@@ -313,32 +320,32 @@ void handleAlarm() {
 // ===================== ON OFF convenience function ===============================
 
 void lampOn() {
-  Serial.print(F("lamp: on"));
+  Serial.println(F("lamp: on"));
   relay.startLamp();
 }
 
 void lampOff() {
-  Serial.print(F("lamp: off"));
+  Serial.println(F("lamp: off"));
   relay.stopLamp();
 }
 
 void fanOn() {
-  Serial.print(F("fan: on"));
+  Serial.println(F("fan: on"));
   relay.startFan();
 }
 
 void fanOff() {
-  Serial.print(F("fan: off"));
+  Serial.println(F("fan: off"));
   relay.stopFan();
 }
 
 void humidifierOn() {
-  Serial.print(F("humidifier: on"));
+  Serial.println(F("humidifier: on"));
   relay.startHumidifier();
 }
 
 void humidifierOff() {
-  Serial.print(F("humidifier: off"));
+  Serial.println(F("humidifier: off"));
   relay.stopHumidifier();
 }
 
@@ -370,7 +377,7 @@ bool tempOK() {
 // True if current humidity is at or over the max defined
 bool humidMax() {
   float humidity = sensors.getLastHumidity();
-  return (humidity >= (HUMIDITY_MAX + HUMIDITY_SLACK_PERCENT) ? true : false;
+  return (humidity >= (HUMIDITY_MAX + HUMIDITY_SLACK_PERCENT)) ? true : false;
 }
 
 // True if current humidity is at or below the minimum defined
@@ -382,8 +389,9 @@ bool humidMin() {
 // True if current humidity is between the min and max defined ranges
 bool humidOK() {
   float humidity = sensors.getLastHumidity();
-  return ((humidity >= (HUMIDITY_MIN - HUMIDITY_SLACK_PERCENT) 
-    && (humidity <= (HUMIDITY_MAX + HUMIDITY_SLACK_PERCENT)) ? true : false;
+  return (
+    (humidity >= (HUMIDITY_MIN - HUMIDITY_SLACK_PERCENT)) 
+    && (humidity <= (HUMIDITY_MAX + HUMIDITY_SLACK_PERCENT))) ? true : false;
 }
 
 
@@ -391,32 +399,41 @@ bool humidOK() {
 
 void periodicControl() {
 
+  Serial.print(F("- periodic climate check - "));
+
   // if everything is in OK range, exit the function and dont make adjustments.
   if (humidOK() && tempOK()) {
+    Serial.println(F(" all good. Byebye"));
     return;
   }
 
   // if the humidity is not inside the min-max range, react:
   if (!humidOK()) {
+    Serial.print(F(" humidity not ok "));
     if (humidMax()) {
-      startFan();
-      stopHumidifier();
-    } else if(humidMin()) {
-      startHumidifier();
-      stopFan();
+      Serial.println(F(" humidity is too high"));
+      fanOn();
+      humidifierOff();
+    } else {
+      Serial.println(F(" humidity is too low"));
+      humidifierOn();
+      fanOff();
     }
   }
 
   // if the temperature is not inside the min-max range, react:
   if (!tempOK()) {
+    Serial.print(F(" temp not ok"));
     if (tempMin()) {
-      startLamp();
+      Serial.println(F(" temp too low"));
+      lampOn();
       
       if (humidOK()) {  // the fan also removes warm air, so:
-        stopFan();      //  If humidity is in OK range, stop the fan if it's running
+        fanOff();      //  If humidity is in OK range, stop the fan if it's running
       }
-    } else if(tempMax()) {
-      stopLamp();
+    } else {
+      Serial.println(F(" temp too high"));
+      lampOff();
     }
   }
   
@@ -427,18 +444,18 @@ void periodicControl() {
 /**
  * The main function and entry point to making the egg tray rotate.
  */
-function periodicEggRotate() {
+void periodicEggRotate() {
   // get the servo's current position (north or south);
   // if north, rotate south
   // if south, rotate north
 }
 
 // code for making the servo go south/that way <--
-function servoGoSouth() {
+void servoGoSouth() {
 
 }
 
 // code for making the servo go north/that way -->
-function servoGoNorth() {
+void servoGoNorth() {
 
 }

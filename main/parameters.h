@@ -14,9 +14,9 @@
 
 // Pin mapping from relay board to arduino IO
 #define PIN_RELAY1_LAMP  10
-#define PIN_RELAY2_HUMIDIFIER  9
+#define PIN_RELAY2_HUMIDIFIER  11
 #define PIN_RELAY3_FAN  8
-//#define PIN_RELAY4_PUMP_B  11
+//#define PIN_RELAY4_PUMP_B  9
 
 // Pin mapping from LCD to arduino IO
 #define PIN_LCD_RS 2
@@ -49,16 +49,16 @@
 #define FAN_DISABLE 0
 
 // -- Start and stop the lamp if temperature is lower or higher than this:
-#define DEGREES_MIN 24
-#define DEGREES_MAX 28
+#define DEGREES_MIN 28
+#define DEGREES_MAX 29
 
 // -- humidity range
 #define HUMIDITY_MIN 45
-#define HUMIDITY_MAX 70
+#define HUMIDITY_MAX 65
 
 // -- PADDING for adding tolerance/slack in the temperature and humidity min and maxes, 0 disables
-#define HUMIDITY_SLACK_PERCENT 5
-#define TEMPERATURE_SLACK_DEGREES 1
+#define HUMIDITY_SLACK_PERCENT 0
+#define TEMPERATURE_SLACK_DEGREES 0
 
 /* Timer Constants & Variables */
 const int COUNTER_1S = 1;
