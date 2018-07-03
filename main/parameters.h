@@ -34,6 +34,9 @@
 // Buzzer
 #define PIN_BUZZER 13
 
+// Servo
+#define PIN_SERVO A1
+
 // ----- RUNNING PARAMETERS -----
 // -- This is the daily alarm
 #define ALARM_DAILY_HOUR 00
@@ -53,12 +56,14 @@
 #define DEGREES_MAX 29
 
 // -- humidity range
-#define HUMIDITY_MIN 45
-#define HUMIDITY_MAX 65
+#define HUMIDITY_MIN 40
+#define HUMIDITY_MAX 43
 
 // -- PADDING for adding tolerance/slack in the temperature and humidity min and maxes, 0 disables
 #define HUMIDITY_SLACK_PERCENT 0
 #define TEMPERATURE_SLACK_DEGREES 0
+#define HUMIDITY_CRITICAL_HIGH_PERCENTAGE 5
+
 
 /* Timer Constants & Variables */
 const int COUNTER_1S = 1;

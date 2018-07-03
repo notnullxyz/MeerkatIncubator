@@ -1,7 +1,7 @@
+#include <ServoTimer2.h>
+
 #include <DS3231_Simple.h>
-
 #include <dht.h>
-
 #include <LiquidCrystal.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -15,6 +15,7 @@ Display display;
 Relay relay;
 Sensors sensors;
 DS3231_Simple Clock;
+ServoTimer2 servo;
 
 volatile uint16_t timercount;
 uint8_t alarmsFired;
@@ -24,6 +25,10 @@ DateTime rtcDateTime;
 
 enum DisplayMode {DISPLAYMODE_SENSORS = 1, DISPLAYMODE_STATUSES = 0}; // toggle switch for display mode.
 DisplayMode displayMode;
+
+enum ServoPosition {SOUTH = 1000, NORTH = 2000, CENTRAL = 1500};  // servo extremes this way or the other
+ServoPosition servoCurrentPos;
+int servoTracker = 0;
 
 // To keep track of device runtimes.
 unsigned long startTimeLamp;
@@ -37,6 +42,12 @@ void setup() {
   Serial.begin(115200);
   Serial.println(F("Startup/setup()"));
 
+  // center the servo.
+  pinMode(PIN_SERVO, OUTPUT);
+  servo.attach(PIN_SERVO);
+  servo.write(CENTRAL);
+  servoCurrentPos = CENTRAL;
+
   // In the beginnining...
   Clock.begin();
   relay.begin();
@@ -46,7 +57,7 @@ void setup() {
   wdt_enable(WDTO_8S);  // watchdog threshold to 8 secs
   configureTimers();
   setupAlarms();
-  buzzerTest();
+  //buzzerTest();
   //whateverWillBuzz();
 }
 
@@ -106,9 +117,10 @@ void whateverWillBuzz() {
 
 
 void loop() {
- 
   wdt_reset();  // reset watchdog, still ok here.
-
+  
+  servo.write(servoCurrentPos);
+  
   if (updateTimers != 0)
   {
     timercount++;
@@ -171,13 +183,15 @@ void task_1S() {
   Serial.print(F("1S"));
   checkAndResetReadingIndicator();
   triggerScreenUpdate();
+  Serial.println(servo.read());
 }
 
 // This function is called every 10 Seconds
 void task_5S() {
   Serial.print(F("5S"));
   readSensorsAndNotify(); // reading sensors every 5 seconds is good enough ?
-  periodicControl();
+  //periodicControl();
+  periodicEggRotate();
 }
 
 // This function is called every minute
@@ -202,7 +216,7 @@ void task_1H() {
 
 // Get the display toggle switch position.
 int getDisplayToggleSwitchPosition() {
-  Serial.println(F("get sw pos"));  
+  //Serial.println(F("get sw pos"));  
   int switchPos = digitalRead(PIN_DISPLAY_MODE_TOGGLESW);
   displayMode = (switchPos == HIGH) ? 1 : 0;
   return displayMode;
@@ -212,7 +226,7 @@ int getDisplayToggleSwitchPosition() {
    Manages a nifty reading indicator on the lcd, times it, and clears it when ready.
 */
 void checkAndResetReadingIndicator() {
-  Serial.print(F("*"));  
+  //Serial.print(F("*"));  
   if (readingIndicatorActive == 1) {
     readingIndicatorActive++;
   } else if (readingIndicatorActive > 1) {
@@ -241,7 +255,7 @@ void readSensorsAndNotify() {
 
 // Keep screen update logic separated out of the timer code.
 void triggerScreenUpdate() {
-  Serial.print(F(" ScrUpd "));  
+  //Serial.print(F(" ScrUpd "));  
   displayMode = getDisplayToggleSwitchPosition();
 
   // Update the display every 5 seconds with statuses depending on the toggle switch position.
@@ -380,6 +394,12 @@ bool humidMax() {
   return (humidity >= (HUMIDITY_MAX + HUMIDITY_SLACK_PERCENT)) ? true : false;
 }
 
+bool humidCriticalHigh() {
+  float humidity = sensors.getLastHumidity();
+  return (humidity >= (HUMIDITY_MAX + HUMIDITY_CRITICAL_HIGH_PERCENTAGE)) ? true : false;
+}
+
+
 // True if current humidity is at or below the minimum defined
 bool humidMin() {
   float humidity = sensors.getLastHumidity();
@@ -399,40 +419,45 @@ bool humidOK() {
 
 void periodicControl() {
 
-  Serial.print(F("- periodic climate check - "));
+  Serial.print(F(" - periodic climate check: "));
 
   // if everything is in OK range, exit the function and dont make adjustments.
   if (humidOK() && tempOK()) {
-    Serial.println(F(" all good. Byebye"));
+    Serial.println(F(" All OK. Doing Nothing."));
+    fanOff();
     return;
   }
 
   // if the humidity is not inside the min-max range, react:
   if (!humidOK()) {
-    Serial.print(F(" humidity not ok "));
-    if (humidMax()) {
-      Serial.println(F(" humidity is too high"));
-      fanOn();
-      humidifierOff();
-    } else {
-      Serial.println(F(" humidity is too low"));
+    Serial.print(F(" Humidity not Normal -> "));
+    if (humidMin()) {
+      Serial.println(F(" Humidity under normal"));
       humidifierOn();
+      fanOff();
+    } else if(humidCriticalHigh()) {
+      Serial.println(F(" Humidity critical high"));
+      humidifierOff();
+      fanOn();
+    } else {
+      Serial.println(F(" Humidity above normal"));
+      humidifierOff();
       fanOff();
     }
   }
 
   // if the temperature is not inside the min-max range, react:
   if (!tempOK()) {
-    Serial.print(F(" temp not ok"));
+    Serial.print(F(" Temp not Normal"));
     if (tempMin()) {
-      Serial.println(F(" temp too low"));
+      Serial.println(F(" Temp under normal"));
       lampOn();
       
       if (humidOK()) {  // the fan also removes warm air, so:
         fanOff();      //  If humidity is in OK range, stop the fan if it's running
       }
     } else {
-      Serial.println(F(" temp too high"));
+      Serial.println(F(" temp above normal"));
       lampOff();
     }
   }
@@ -445,17 +470,37 @@ void periodicControl() {
  * The main function and entry point to making the egg tray rotate.
  */
 void periodicEggRotate() {
-  // get the servo's current position (north or south);
-  // if north, rotate south
-  // if south, rotate north
+  Serial.print(F("Egg Rotation : "));
+  servoCurrentPos = servo.read();
+  if (servoTracker == 0) {
+    servoGoSouth();
+  } else {
+    servoGoNorth();
+  }
 }
 
-// code for making the servo go south/that way <--
 void servoGoSouth() {
-
+  Serial.println(F(" going South"));
+  int cur = servo.read();
+  servoTracker = 1;
+  for (int i = cur; i >= SOUTH; i = i - 15) {
+    servo.write(i);
+    servoCurrentPos = i;
+    Serial.print(","); Serial.print(servoCurrentPos);
+    delay(60);
+  }
 }
 
 // code for making the servo go north/that way -->
 void servoGoNorth() {
-
+  Serial.println(F(" going North"));
+  int cur = servo.read();
+  servoTracker = 0;
+  for (int i = cur; i <= NORTH; i = i + 15) {
+    servo.write(i);
+    servoCurrentPos = i;
+    Serial.print(","); Serial.print(servoCurrentPos);
+    delay(60);
+  }
 }
+
