@@ -52,12 +52,12 @@
 #define FAN_DISABLE 0
 
 // -- Start and stop the lamp if temperature is lower or higher than this:
-#define DEGREES_MIN 28
-#define DEGREES_MAX 29
+#define DEGREES_MIN 38
+#define DEGREES_MAX 39
 
 // -- humidity range
-#define HUMIDITY_MIN 40
-#define HUMIDITY_MAX 43
+#define HUMIDITY_MIN 50
+#define HUMIDITY_MAX 55
 
 // -- PADDING for adding tolerance/slack in the temperature and humidity min and maxes, 0 disables
 #define HUMIDITY_SLACK_PERCENT 0

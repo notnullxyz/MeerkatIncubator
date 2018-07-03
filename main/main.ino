@@ -26,9 +26,12 @@ DateTime rtcDateTime;
 enum DisplayMode {DISPLAYMODE_SENSORS = 1, DISPLAYMODE_STATUSES = 0}; // toggle switch for display mode.
 DisplayMode displayMode;
 
-enum ServoPosition {SOUTH = 1000, NORTH = 2000, CENTRAL = 1500};  // servo extremes this way or the other
+enum ServoPosition {SOUTH = 1250, NORTH = 1730, CENTRAL = 1450};  // servo extremes this way or the other
 ServoPosition servoCurrentPos;
 int servoTracker = 0;
+
+// alarm state - while this is not 0 - act alarmed.
+int alarmed = 0;
 
 // To keep track of device runtimes.
 unsigned long startTimeLamp;
@@ -47,6 +50,7 @@ void setup() {
   servo.attach(PIN_SERVO);
   servo.write(CENTRAL);
   servoCurrentPos = CENTRAL;
+  delay(3000);
 
   // In the beginnining...
   Clock.begin();
@@ -57,7 +61,7 @@ void setup() {
   wdt_enable(WDTO_8S);  // watchdog threshold to 8 secs
   configureTimers();
   setupAlarms();
-  //buzzerTest();
+  buzzerTest();
   //whateverWillBuzz();
 }
 
@@ -76,9 +80,7 @@ void buzzerTest() {
 }
 
 void buzzerHourly() {
-  tone(PIN_BUZZER, 650, 300);
-  delay(350);
-  tone(PIN_BUZZER, 800, 300);
+  tone(PIN_BUZZER, 1200, 300);
   delay(350);
   tone(PIN_BUZZER, 1250, 400);
   delay(350);  
@@ -190,8 +192,9 @@ void task_1S() {
 void task_5S() {
   Serial.print(F("5S"));
   readSensorsAndNotify(); // reading sensors every 5 seconds is good enough ?
-  //periodicControl();
-  periodicEggRotate();
+  periodicControl();
+  //periodicEggRotate();
+  checkAlarmState();
 }
 
 // This function is called every minute
@@ -212,6 +215,20 @@ void task_1H() {
 }
 
 
+// ==================== CLIMATE ALARM ===========================
+
+void checkAlarmState() {
+  if (alarmed) {
+    climateAlarmHandler();
+  }
+}
+
+// deal with the alarmed = 1 state here
+void climateAlarmHandler() {
+  buzzerHourly();
+}
+
+// ===============================================================
 
 
 // Get the display toggle switch position.
@@ -319,7 +336,7 @@ void setupAlarms() {
 }
 
 /**
-   This is the handler function for the main daily alarm...
+   This is the handler function for the main daily alarm... this is the daily alarm instruction, not temp/humidity alarm
 */
 void handleAlarm() {
   Serial.print(F("ALARM_MAIN!"));
@@ -424,6 +441,7 @@ void periodicControl() {
   // if everything is in OK range, exit the function and dont make adjustments.
   if (humidOK() && tempOK()) {
     Serial.println(F(" All OK. Doing Nothing."));
+    alarmed = 0;
     fanOff();
     return;
   }
@@ -435,10 +453,12 @@ void periodicControl() {
       Serial.println(F(" Humidity under normal"));
       humidifierOn();
       fanOff();
+      alarmed = 1;
     } else if(humidCriticalHigh()) {
       Serial.println(F(" Humidity critical high"));
       humidifierOff();
       fanOn();
+      alarmed = 1;
     } else {
       Serial.println(F(" Humidity above normal"));
       humidifierOff();
@@ -449,6 +469,7 @@ void periodicControl() {
   // if the temperature is not inside the min-max range, react:
   if (!tempOK()) {
     Serial.print(F(" Temp not Normal"));
+    alarmed = 1;
     if (tempMin()) {
       Serial.println(F(" Temp under normal"));
       lampOn();
@@ -486,8 +507,8 @@ void servoGoSouth() {
   for (int i = cur; i >= SOUTH; i = i - 15) {
     servo.write(i);
     servoCurrentPos = i;
-    Serial.print(","); Serial.print(servoCurrentPos);
-    delay(60);
+    //Serial.print(","); Serial.print(servoCurrentPos);
+    delay(70);
   }
 }
 
@@ -499,8 +520,8 @@ void servoGoNorth() {
   for (int i = cur; i <= NORTH; i = i + 15) {
     servo.write(i);
     servoCurrentPos = i;
-    Serial.print(","); Serial.print(servoCurrentPos);
-    delay(60);
+    //Serial.print(","); Serial.print(servoCurrentPos);
+    delay(70);
   }
 }
 
